@@ -51,7 +51,6 @@ kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply 
 kubectl apply -n argo-rollouts -f https://raw.githubusercontent.com/argoproj/argo-rollouts/stable/manifests/install.yaml
 
 echo "Aguardando pods do argo-rollouts..."
-# fallback wait simples
 sleep 8
 kubectl -n argo-rollouts get pods || true
 
@@ -69,6 +68,21 @@ if ! command -v kubectl-argo-rollouts >/dev/null 2>&1; then
   fi
 fi
 
-echo "Setup inicial concluído."
-echo "Verifique: kubectl get nodes ; kubectl -n ingress-nginx get pods ; kubectl -n argo-rollouts get pods"
-echo "Se a porta ${HOST_HTTP_PORT} estiver ocupada, edite 'kind-config.yaml' e recrie o cluster com HOST_HTTP_PORT diferente."
+# Instala Argo CD
+echo "Instalando Argo CD..."
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+echo "Aguardando Argo CD iniciar..."
+kubectl -n argocd wait --for=condition=available deployment/argocd-server --timeout=180s || kubectl -n argocd get pods
+
+echo "Fazendo port-forward da UI do Argo CD (https://localhost:8080)"
+kubectl port-forward svc/argocd-server -n argocd 8080:443 &
+sleep 5
+
+echo "Senha inicial do Argo CD (usuário: admin):"
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 --decode && echo
+
+echo "Setup concluído. Acesse https://localhost:8080 para ver o Argo CD UI."
+echo "Use usuário 'admin' e a senha acima para login."
